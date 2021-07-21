@@ -1,8 +1,9 @@
-import Link from "next/link";
-import { useRouter } from "next/router";
-import { GetStaticProps, GetStaticPaths } from "next";
-import styles from "../../styles/Home.module.css";
 import { useState } from "react";
+import { GetStaticProps, GetStaticPaths } from "next";
+import Link from "next/Link";
+import { useRouter } from "next/router";
+import { getPosts, getSinglePost } from "../../lib/posts";
+
 type PostType = {
   title: string;
   url: string;
@@ -10,31 +11,6 @@ type PostType = {
   html: string;
   reading_time: number;
   feature_image: string;
-};
-
-const { CONTENT_API_KEY, BLOG_URL } = process.env;
-
-const getPostData = async (slug: string) => {
-  const res = await fetch(
-    `${BLOG_URL}/ghost/api/v3/content/posts/slug/${slug}?key=${CONTENT_API_KEY}&fields=title,url,slug,html,reading_time,feature_image`
-  ).then((res) => res.json());
-
-  console.log(res);
-  return res.posts[0];
-};
-
-export const getStaticProps: GetStaticProps = async ({ params }: any) => {
-  const postData = await getPostData(params.slug as string);
-  return {
-    props: { postData },
-  };
-};
-
-export const getStaticPaths: GetStaticPaths = async () => {
-  return {
-    paths: [],
-    fallback: true,
-  };
 };
 
 const Post: React.FC<{ postData: PostType }> = ({ postData }) => {
@@ -48,7 +24,7 @@ const Post: React.FC<{ postData: PostType }> = ({ postData }) => {
   const loadComments = () => {
     setFirstTime(false);
 
-    (window as any).disqus_config = () => {
+    (window as any).disqus_config = function () {
       this.page.url = window.location.href;
       this.page.identifier = postData.slug;
     };
@@ -60,7 +36,7 @@ const Post: React.FC<{ postData: PostType }> = ({ postData }) => {
   };
 
   return (
-    <div className={styles.container}>
+    <div className={"container"}>
       <Link href="/">
         <a>Back</a>
       </Link>
@@ -75,3 +51,30 @@ const Post: React.FC<{ postData: PostType }> = ({ postData }) => {
 };
 
 export default Post;
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const posts = await getPosts();
+
+  const paths = posts.map((post: PostType) => ({
+    params: { slug: post.slug },
+  }));
+
+  return {
+    paths: paths,
+    fallback: false,
+  };
+};
+
+export const getStaticProps: GetStaticProps = async (context: any) => {
+  const postData = await getSinglePost(context.params.slug);
+
+  if (!postData) {
+    return {
+      notFound: true,
+    };
+  }
+
+  return {
+    props: { postData },
+  };
+};
